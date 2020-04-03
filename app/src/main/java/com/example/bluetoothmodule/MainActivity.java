@@ -27,7 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothAdapter bluetoothAdapter;
 
     // Create a BroadcastReceiver for ACTION_STATE_CHANGED.
-    private final BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
+    private final BroadcastReceiver broadcastReceiverState = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (Objects.requireNonNull(action).equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
@@ -50,10 +50,38 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    // Create a BroadcastReceiver for Discorable.
+    private final BroadcastReceiver broadcastReceiverDiscorable = new BroadcastReceiver() {
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED)) {
+                int mode = intent.getIntExtra(BluetoothAdapter.EXTRA_SCAN_MODE, BluetoothAdapter.ERROR);
+                switch (mode) {
+                    //Dispositivo Visible
+                    case BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE:
+                        Log.d(TAG, "Discoberality Enabled");
+                        break;
+                    case BluetoothAdapter.SCAN_MODE_CONNECTABLE:
+                        Log.d(TAG, "Habilitado para recibir conexion");
+                        break;
+                    case BluetoothAdapter.SCAN_MODE_NONE:
+                        Log.d(TAG, "No habilitado para recibir conexión");
+                        break;
+                    case BluetoothAdapter.STATE_DISCONNECTING:
+                        Log.d(TAG, "STATE_DISCONNECTING");
+                        break;
+                    case BluetoothAdapter.STATE_CONNECTED:
+                        Log.d(TAG, "STATE_CONNECTED");
+                        break;
+                }
+            }
+        }
+    };
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(broadcastReceiver);
+        unregisterReceiver(broadcastReceiverState);
     }
 
     @Override
@@ -80,10 +108,11 @@ public class MainActivity extends AppCompatActivity {
             if (swState.isEnabled()) {
                 showRecyclers();
                 btnUpdate.setEnabled(true);
+                enableDisableDiscorable();
             }
         } else {
             swState.setChecked(false);
-            btnUpdate.setEnabled(true);
+            btnUpdate.setEnabled(false);
             Toast.makeText(this, "isEnabled Error", Toast.LENGTH_SHORT).show();
         }
 
@@ -92,37 +121,58 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 enableDisableBluetooth();
+                enableDisableDiscorable();
 
-                if (swState.isEnabled())
+
+                if (swState.isEnabled()) {
+                    btnUpdate.setEnabled(true);
                     showRecyclers();
-                else {
+                } else {
+                    btnUpdate.setEnabled(false);
                     rvAvailableDevices.setVisibility(View.GONE);
                     rvPairedDevices.setVisibility(View.GONE);
                 }
             }
         });
 
+        btnUpdate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                enableDisableDiscorable();
+            }
+        });
+
+    }
+
+    private void enableDisableDiscorable() {
+
+        Intent discorableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+        discorableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION,300);
+        startActivity(discorableIntent);
+
+        IntentFilter intentFilter = new IntentFilter(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED);
+        registerReceiver(broadcastReceiverDiscorable, intentFilter);
     }
 
     private void enableDisableBluetooth() {
         if (bluetoothAdapter == null) {
             Toast.makeText(this, "Does not have bluetooth capabilities", Toast.LENGTH_SHORT).show();
         }
+
         if (!bluetoothAdapter.isEnabled()) {
             Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivity(enableIntent);
 
             IntentFilter intentFilterEnable = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
-            registerReceiver(broadcastReceiver, intentFilterEnable);
+            registerReceiver(broadcastReceiverState, intentFilterEnable);
         }
 
         if (bluetoothAdapter.isEnabled()) {
             bluetoothAdapter.disable();
 
             IntentFilter intentFilterDisable = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
-            registerReceiver(broadcastReceiver, intentFilterDisable);
+            registerReceiver(broadcastReceiverState, intentFilterDisable);
         }
-
     }
 
     private void bindUI() {
@@ -137,5 +187,4 @@ public class MainActivity extends AppCompatActivity {
         rvAvailableDevices.setVisibility(View.VISIBLE);
         rvPairedDevices.setVisibility(View.VISIBLE);
     }
-
 }
