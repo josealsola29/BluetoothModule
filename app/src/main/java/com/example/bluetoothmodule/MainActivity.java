@@ -1,30 +1,42 @@
 package com.example.bluetoothmodule;
 
+import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.util.ArrayList;
 import java.util.Objects;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MAIN_ACTIVITY!!!";
     private Button btnUpdate;
     private Switch swState;
-    private RecyclerView rvPairedDevices, rvAvailableDevices;
+    private RecyclerView rvPairedDevices, rvBondedDevices;
     private TextView tvDeviceName;
     private BluetoothAdapter bluetoothAdapter;
+    private DevicePairedAdapter devicePairedAdapter;
+    private DeviceBondedAdapter deviceBondedAdapter;
+    private ArrayList<BluetoothDevice> bluetoothDevices = new ArrayList<>();
+    private ArrayList<BluetoothDevice> bondedDevices = new ArrayList<>();
 
     // Create a BroadcastReceiver for ACTION_STATE_CHANGED.
     private final BroadcastReceiver broadcastReceiverState = new BroadcastReceiver() {
@@ -54,7 +66,7 @@ public class MainActivity extends AppCompatActivity {
     private final BroadcastReceiver broadcastReceiverDiscorable = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            if (action.equals(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED)) {
+            if (Objects.requireNonNull(action).equals(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED)) {
                 int mode = intent.getIntExtra(BluetoothAdapter.EXTRA_SCAN_MODE, BluetoothAdapter.ERROR);
                 switch (mode) {
                     //Dispositivo Visible
@@ -77,6 +89,19 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
+    // Create a BroadcastReceiver for Discorable.
+    private final BroadcastReceiver broadcastReceiverDiscover = new BroadcastReceiver() {
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            if (action.equals(BluetoothDevice.ACTION_FOUND)) {
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                bluetoothDevices.add(device);
+            }
+            devicePairedAdapter = new DevicePairedAdapter(bluetoothDevices);//TODO CAMBIAR
+            rvBondedDevices.setAdapter(devicePairedAdapter);
+        }
+    };
 
     @Override
     protected void onDestroy() {
@@ -90,16 +115,18 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         bindUI();
 
-        rvAvailableDevices.setVisibility(View.GONE);
+        rvBondedDevices.setVisibility(View.GONE);
         rvPairedDevices.setVisibility(View.GONE);
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
 
         if (bluetoothAdapter == null) {
             swState.setChecked(false);
+            swState.setVisibility(View.GONE);
             Toast.makeText(this, "getDefaultAdapter Error", Toast.LENGTH_SHORT).show();
-        } else
+        } else {
             swState.setChecked(true);
+        }
 
         //Si el BLUETOOTH esta habilitado
         if (bluetoothAdapter.isEnabled()) {
@@ -107,8 +134,10 @@ public class MainActivity extends AppCompatActivity {
             swState.setChecked(true);
             if (swState.isEnabled()) {
                 showRecyclers();
+                showPairedDevices();
                 btnUpdate.setEnabled(true);
-                enableDisableDiscorable();
+                enableDiscorable();
+                discoverDevices();
             }
         } else {
             swState.setChecked(false);
@@ -116,20 +145,19 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "isEnabled Error", Toast.LENGTH_SHORT).show();
         }
 
-        //Si presionan el SWITCH
-        swState.setOnClickListener(new View.OnClickListener() {
+        //Si cambia el estado del bluetooth
+        swState.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
-            public void onClick(View v) {
-                enableDisableBluetooth();
-                enableDisableDiscorable();
-
-
-                if (swState.isEnabled()) {
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                if (isChecked) {
+                    enableDisableBluetooth();
+                    enableDiscorable();
                     btnUpdate.setEnabled(true);
                     showRecyclers();
                 } else {
+                    enableDisableBluetooth();
                     btnUpdate.setEnabled(false);
-                    rvAvailableDevices.setVisibility(View.GONE);
+                    rvBondedDevices.setVisibility(View.GONE);
                     rvPairedDevices.setVisibility(View.GONE);
                 }
             }
@@ -138,25 +166,79 @@ public class MainActivity extends AppCompatActivity {
         btnUpdate.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                enableDisableDiscorable();
+                enableDiscorable();
             }
         });
-
     }
 
-    private void enableDisableDiscorable() {
+    private void showPairedDevices() {
+        Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
 
+        if (pairedDevices.size() > 0) {
+            // There are paired devices. Get the name and address of each paired device.
+            bondedDevices.addAll(pairedDevices);
+            deviceBondedAdapter = new DeviceBondedAdapter(bondedDevices);
+            rvBondedDevices.setAdapter(deviceBondedAdapter);
+        }
+    }
+
+    private void enableDiscorable() {
         Intent discorableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
-        discorableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION,300);
+        discorableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
         startActivity(discorableIntent);
 
         IntentFilter intentFilter = new IntentFilter(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED);
         registerReceiver(broadcastReceiverDiscorable, intentFilter);
     }
 
+    private void discoverDevices() {
+        if (bluetoothAdapter.isDiscovering()) {
+            bluetoothAdapter.cancelDiscovery();
+            checkBTPermission();
+
+            bluetoothAdapter.startDiscovery();
+            IntentFilter intentFilterDiscover = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+            registerReceiver(broadcastReceiverDiscover, intentFilterDiscover);
+        }
+        if (!bluetoothAdapter.isDiscovering()) {
+            checkBTPermission();
+            bluetoothAdapter.startDiscovery();
+            IntentFilter intentFilterDiscover = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+            registerReceiver(broadcastReceiverDiscover, intentFilterDiscover);
+        }
+    }
+
+    private void checkBTPermission() {
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+
+            // Asking user if explanation is needed
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                    Manifest.permission.ACCESS_FINE_LOCATION)) {
+
+                // Show an explanation to the user *asynchronously* -- don't block
+                // this thread waiting for the user's response! After the user
+                // sees the explanation, try again to request the permission.
+
+                //Prompt the user once explanation has been shown
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
+                        1001
+                );
+            } else {
+                // No explanation needed, we can request the permission.
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION},
+                        1002);
+            }
+        }
+    }
+
     private void enableDisableBluetooth() {
         if (bluetoothAdapter == null) {
             Toast.makeText(this, "Does not have bluetooth capabilities", Toast.LENGTH_SHORT).show();
+            return;
         }
 
         if (!bluetoothAdapter.isEnabled()) {
@@ -169,7 +251,6 @@ public class MainActivity extends AppCompatActivity {
 
         if (bluetoothAdapter.isEnabled()) {
             bluetoothAdapter.disable();
-
             IntentFilter intentFilterDisable = new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
             registerReceiver(broadcastReceiverState, intentFilterDisable);
         }
@@ -178,13 +259,13 @@ public class MainActivity extends AppCompatActivity {
     private void bindUI() {
         btnUpdate = findViewById(R.id.btnUpdate);
         swState = findViewById(R.id.swState);
-        rvAvailableDevices = findViewById(R.id.rvAvailableDevices);
+        rvBondedDevices = findViewById(R.id.rvBondedDevices);
         rvPairedDevices = findViewById(R.id.rvPairedDevices);
         tvDeviceName = findViewById(R.id.tvDeviceName);
     }
 
     private void showRecyclers() {
-        rvAvailableDevices.setVisibility(View.VISIBLE);
+        rvBondedDevices.setVisibility(View.VISIBLE);
         rvPairedDevices.setVisibility(View.VISIBLE);
     }
 }
