@@ -11,11 +11,13 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 
-class DeviceBondedAdapter  extends RecyclerView.Adapter<DeviceBondedAdapter.ViewHolder> {
+class DeviceBondedAdapter extends RecyclerView.Adapter<DeviceBondedAdapter.ViewHolder> {
     private ArrayList<BluetoothDevice> pairedDevices;
+    private OnDeviceBondedListener onDeviceBondedListener;
 
-    public DeviceBondedAdapter(ArrayList<BluetoothDevice> bluetoothDevices) {
+    public DeviceBondedAdapter(ArrayList<BluetoothDevice> bluetoothDevices, OnDeviceBondedListener onDeviceBondedListener) {
         this.pairedDevices = bluetoothDevices;
+        this.onDeviceBondedListener = onDeviceBondedListener;
     }
 
     @NonNull
@@ -23,7 +25,7 @@ class DeviceBondedAdapter  extends RecyclerView.Adapter<DeviceBondedAdapter.View
     public DeviceBondedAdapter.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.recycler_item_bonded, parent, false);
-        return new ViewHolder(view);
+        return new ViewHolder(view, onDeviceBondedListener);
     }
 
     @Override
@@ -38,12 +40,24 @@ class DeviceBondedAdapter  extends RecyclerView.Adapter<DeviceBondedAdapter.View
         return pairedDevices.size();
     }
 
-    public class ViewHolder extends RecyclerView.ViewHolder {
+    public class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
         private TextView tvNameDeviceBonded;
+        OnDeviceBondedListener onDeviceBondedListener;
 
-        public ViewHolder(@NonNull View itemView) {
+        public ViewHolder(@NonNull View itemView, OnDeviceBondedListener onDeviceBondedListener) {
             super(itemView);
             tvNameDeviceBonded = itemView.findViewById(R.id.tvNameDeviceBonded);
+            this.onDeviceBondedListener = onDeviceBondedListener;
+            itemView.setOnClickListener(this);
         }
+
+        @Override
+        public void onClick(View v) {
+            onDeviceBondedListener.onDeviceBondedClick(getAdapterPosition());
+        }
+    }
+
+    public interface OnDeviceBondedListener {
+        void onDeviceBondedClick(int position);
     }
 }

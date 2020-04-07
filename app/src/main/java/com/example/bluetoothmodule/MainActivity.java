@@ -20,20 +20,22 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Set;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity  implements DeviceBondedAdapter.OnDeviceBondedListener, DeviceAvailableAdapter.OnDeviceAvailableListener {
     private static final String TAG = "MAIN_ACTIVITY!!!";
+    private Context context;
     private Button btnUpdate;
     private Switch swState;
     private RecyclerView rvPairedDevices, rvBondedDevices;
     private TextView tvDeviceName;
     private BluetoothAdapter bluetoothAdapter;
-    private DevicePairedAdapter devicePairedAdapter;
+    private DeviceAvailableAdapter deviceAvailableAdapter;
     private DeviceBondedAdapter deviceBondedAdapter;
     private ArrayList<BluetoothDevice> bluetoothDevices = new ArrayList<>();
     private ArrayList<BluetoothDevice> bondedDevices = new ArrayList<>();
@@ -94,12 +96,37 @@ public class MainActivity extends AppCompatActivity {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
 
-            if (action.equals(BluetoothDevice.ACTION_FOUND)) {
+            if (Objects.requireNonNull(action).equals(BluetoothDevice.ACTION_FOUND)) {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                bluetoothDevices.add(device);
+                if (!bluetoothDevices.contains(device))
+                    bluetoothDevices.add(device);
             }
-            devicePairedAdapter = new DevicePairedAdapter(bluetoothDevices);//TODO CAMBIAR
-            rvBondedDevices.setAdapter(devicePairedAdapter);
+            rvPairedDevices.setLayoutManager(new LinearLayoutManager(context));
+//            deviceAvailableAdapter = new DeviceAvailableAdapter(bluetoothDevices,this );
+            rvPairedDevices.setAdapter(deviceAvailableAdapter);
+        }
+    };
+
+    // Create a BroadcastReceiver for Discorable.
+    private final BroadcastReceiver broadcastReceiverBond = new BroadcastReceiver() {
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+
+            if (Objects.requireNonNull(action).equals(BluetoothDevice.ACTION_BOND_STATE_CHANGED)) {
+                BluetoothDevice bluetoothDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                if(bluetoothDevice.getBondState()==BluetoothDevice.BOND_BONDED)
+                    Toast.makeText(context, "Se ha vinculado exitosamente el dispositivo. "
+                            + bluetoothDevice.getName(), Toast.LENGTH_SHORT).show();
+                if(bluetoothDevice.getBondState()==BluetoothDevice.BOND_BONDED)
+                    Toast.makeText(context, "Se ha vinculado exitosamente el dispositivo. "
+                            + bluetoothDevice.getName(), Toast.LENGTH_SHORT).show();
+                if (bluetoothDevice.getBondState() == BluetoothDevice.BOND_BONDED)
+                    Toast.makeText(context, "Se ha vinculado exitosamente el dispositivo. "
+                            + bluetoothDevice.getName(), Toast.LENGTH_SHORT).show();
+
+
+            }
+
         }
     };
 
@@ -107,18 +134,23 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         unregisterReceiver(broadcastReceiverState);
+        unregisterReceiver(broadcastReceiverBond);
+        unregisterReceiver(broadcastReceiverDiscorable);
+        unregisterReceiver(broadcastReceiverDiscover);
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        context=this;
         bindUI();
 
         rvBondedDevices.setVisibility(View.GONE);
         rvPairedDevices.setVisibility(View.GONE);
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        tvDeviceName.setText(bluetoothAdapter.getName());
 
         if (bluetoothAdapter == null) {
             swState.setChecked(false);
@@ -136,7 +168,7 @@ public class MainActivity extends AppCompatActivity {
                 showRecyclers();
                 showPairedDevices();
                 btnUpdate.setEnabled(true);
-                enableDiscorable();
+                enableDiscoverable();
                 discoverDevices();
             }
         } else {
@@ -151,9 +183,11 @@ public class MainActivity extends AppCompatActivity {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
                     enableDisableBluetooth();
-                    enableDiscorable();
+                    enableDiscoverable();
                     btnUpdate.setEnabled(true);
                     showRecyclers();
+                    showPairedDevices();
+                    discoverDevices();
                 } else {
                     enableDisableBluetooth();
                     btnUpdate.setEnabled(false);
@@ -166,7 +200,7 @@ public class MainActivity extends AppCompatActivity {
         btnUpdate.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                enableDiscorable();
+                discoverDevices();
             }
         });
     }
@@ -177,12 +211,13 @@ public class MainActivity extends AppCompatActivity {
         if (pairedDevices.size() > 0) {
             // There are paired devices. Get the name and address of each paired device.
             bondedDevices.addAll(pairedDevices);
-            deviceBondedAdapter = new DeviceBondedAdapter(bondedDevices);
+            deviceBondedAdapter = new DeviceBondedAdapter(bondedDevices,this);
+            rvBondedDevices.setLayoutManager(new LinearLayoutManager(this));
             rvBondedDevices.setAdapter(deviceBondedAdapter);
         }
     }
 
-    private void enableDiscorable() {
+    private void enableDiscoverable() {
         Intent discorableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
         discorableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
         startActivity(discorableIntent);
@@ -267,5 +302,15 @@ public class MainActivity extends AppCompatActivity {
     private void showRecyclers() {
         rvBondedDevices.setVisibility(View.VISIBLE);
         rvPairedDevices.setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    public void onDeviceAvailableClick(int position) {
+
+    }
+
+    @Override
+    public void onDeviceBondedClick(int position) {
+
     }
 }
