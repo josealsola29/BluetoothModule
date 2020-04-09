@@ -35,6 +35,9 @@ class DeviceBondedAdapter extends RecyclerView.Adapter<DeviceBondedAdapter.ViewH
         }
     }
 
+    public void notiData(){
+        notifyDataSetChanged();
+    }
     @Override
     public int getItemCount() {
         return pairedDevices.size();
