@@ -98,11 +98,11 @@ public class MainActivity extends AppCompatActivity implements DeviceBondedAdapt
 
             if (Objects.requireNonNull(action).equals(BluetoothDevice.ACTION_FOUND)) {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if (!bluetoothDevices.contains(device)){
+                if (!bluetoothDevices.contains(device)) {
                     bluetoothDevices.add(device);
                     deviceAvailableAdapter.notifyDataSetChanged();
                 }
-
+                addDevicesDiscovered();
             }
         }
     };
@@ -128,14 +128,6 @@ public class MainActivity extends AppCompatActivity implements DeviceBondedAdapt
         }
     };
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        unregisterReceiver(broadcastReceiverState);
-        unregisterReceiver(broadcastReceiverBond);
-        unregisterReceiver(broadcastReceiverDiscorable);
-        unregisterReceiver(broadcastReceiverDiscover);
-    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -163,8 +155,8 @@ public class MainActivity extends AppCompatActivity implements DeviceBondedAdapt
             swState.setChecked(true);
             if (swState.isEnabled()) {
                 showRecyclers();
-                showPairedDevices();
                 btnUpdate.setEnabled(true);
+                showPairedDevices();
                 enableDiscoverable();
                 discoverDevices();
             }
@@ -204,7 +196,6 @@ public class MainActivity extends AppCompatActivity implements DeviceBondedAdapt
 
     private void showPairedDevices() {
         Set<BluetoothDevice> pairedDevices = bluetoothAdapter.getBondedDevices();
-
         if (pairedDevices.size() > 0) {
             // There are paired devices. Get the name and address of each paired device.
             bondedDevices.addAll(pairedDevices);
@@ -214,6 +205,7 @@ public class MainActivity extends AppCompatActivity implements DeviceBondedAdapt
         }
     }
 
+    //Habilita las funciones que permite que el dispositivo se meustre reconocible
     private void enableDiscoverable() {
         Intent discorableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
         discorableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
@@ -231,9 +223,6 @@ public class MainActivity extends AppCompatActivity implements DeviceBondedAdapt
             bluetoothAdapter.startDiscovery();
             IntentFilter intentFilterDiscover = new IntentFilter(BluetoothDevice.ACTION_FOUND);
             registerReceiver(broadcastReceiverDiscover, intentFilterDiscover);
-            rvPairedDevices.setLayoutManager(new LinearLayoutManager(this));
-            deviceAvailableAdapter = new DeviceAvailableAdapter(bluetoothDevices, this);
-            rvPairedDevices.setAdapter(deviceAvailableAdapter);
         }
         if (!bluetoothAdapter.isDiscovering()) {
             checkBTPermission();
@@ -307,14 +296,32 @@ public class MainActivity extends AppCompatActivity implements DeviceBondedAdapt
         rvPairedDevices.setVisibility(View.VISIBLE);
     }
 
+    private void addDevicesDiscovered(){
+        rvPairedDevices.setLayoutManager(new LinearLayoutManager(this));
+        deviceAvailableAdapter = new DeviceAvailableAdapter(bluetoothDevices, this);
+        rvPairedDevices.setAdapter(deviceAvailableAdapter);
+    }
+
     @Override
     public void onDeviceAvailableClick(int position) {
         bluetoothAdapter.cancelDiscovery();
         bondedDevices.get(position).createBond();
+        showPairedDevices();
     }
 
     @Override
     public void onDeviceBondedClick(int position) {
 
     }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(broadcastReceiverState);
+        unregisterReceiver(broadcastReceiverBond);
+        unregisterReceiver(broadcastReceiverDiscorable);
+        unregisterReceiver(broadcastReceiverDiscover);
+    }
 }
+
+
