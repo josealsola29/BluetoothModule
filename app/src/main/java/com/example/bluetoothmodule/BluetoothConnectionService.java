@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.Objects;
 import java.util.UUID;
 
 public class BluetoothConnectionService {
@@ -33,6 +34,7 @@ public class BluetoothConnectionService {
     public BluetoothConnectionService(Context context) {
         this.bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         this.context = context;
+        start();
     }
 
     private class AcceptThread extends Thread {
@@ -47,6 +49,7 @@ public class BluetoothConnectionService {
                 tmp = bluetoothAdapter.listenUsingRfcommWithServiceRecord(appName, MY_UUID_INSECURE);
                 Log.d(TAG, "AcceptThread: Setting up Server using" + MY_UUID_INSECURE);
             } catch (IOException e) {
+                Log.e(TAG, "AcceptThread: Error constructor");
                 Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
             }
             bluetoothServerSocket = tmp;
@@ -61,6 +64,7 @@ public class BluetoothConnectionService {
                 bluetoothSocket = bluetoothServerSocket.accept();
                 Log.d(TAG, "run: RFCOM server socket accepted connection.");
             } catch (IOException e) {
+                Log.e(TAG, "run: RFCOM server socket error. " + e.getMessage());
                 Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
             }
 
@@ -68,7 +72,6 @@ public class BluetoothConnectionService {
                 connected(bluetoothSocket, bluetoothDevice);//todo revisar
             }
             Log.i(TAG, "END mAcceptThread");
-
         }
 
         public void cancel() {
@@ -172,6 +175,7 @@ public class BluetoothConnectionService {
         private final OutputStream outputStream;
 
         public ConnectedThread(BluetoothSocket socket) {
+            Log.d(TAG, "ConnectedThread: Starting.");
             Toast.makeText(context, TAG + " ConnectedThread: Starting.", Toast.LENGTH_SHORT).show();
 
             bluetoothSocket = socket;
@@ -179,12 +183,18 @@ public class BluetoothConnectionService {
             OutputStream tmpOut = null;
 
             //dismiss the progressDialog when connection is established
-            progressDialog.dismiss();
+            try {
+                progressDialog.dismiss();
+
+            } catch (Exception e) {
+                Log.e(TAG, "Error Progress Dialog: " + e.getMessage());
+            }
 
             try {
                 tmpIn = bluetoothSocket.getInputStream();
                 tmpOut = bluetoothSocket.getOutputStream();
             } catch (IOException e) {
+                Log.e(TAG, "ConnectedThread: Error " + e.getMessage());
                 Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
             }
 
@@ -210,8 +220,8 @@ public class BluetoothConnectionService {
         }
 
         //Call this from the MainActivity to send data to the remote device
-        public void write(byte[] bytes){
-            String text= new String (bytes, Charset.defaultCharset());
+        public void write(byte[] bytes) {
+            String text = new String(bytes, Charset.defaultCharset());
             Log.d(TAG, "write, Writting to outputStream: " + text);
             try {
                 outputStream.write(bytes);
@@ -225,12 +235,23 @@ public class BluetoothConnectionService {
             try {
                 bluetoothSocket.close();
             } catch (IOException e) {
-                Log.e(TAG, e.getMessage());
+                Log.e(TAG, Objects.requireNonNull(e.getMessage()));
             }
         }
     }
 
-    private void connected(BluetoothSocket bluetoothSocket, BluetoothDevice bluetoothDevice){
+    private void connected(BluetoothSocket bluetoothSocket, BluetoothDevice bluetoothDevice) {
+        Log.d(TAG, "connected: Starting");
+        connectedThread = new ConnectedThread(bluetoothSocket);
+        connectedThread.start();
+    }
 
+    private void write(byte[] out) {
+        //Create temporary object
+        ConnectedThread r;
+        //Synchronize a copy of the ConnectedThread
+        Log.d(TAG, "write: Write called");
+        //Perform the write
+        connectedThread.write(out);
     }
 }
