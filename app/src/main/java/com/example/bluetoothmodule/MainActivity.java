@@ -50,6 +50,7 @@ public class MainActivity extends AppCompatActivity implements DeviceBondedAdapt
     private static final UUID MY_UUID_INSECURE =
             UUID.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66");
 
+
     // Create a BroadcastReceiver for ACTION_STATE_CHANGED.
     private final BroadcastReceiver broadcastReceiverState = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
@@ -77,6 +78,7 @@ public class MainActivity extends AppCompatActivity implements DeviceBondedAdapt
     // Create a BroadcastReceiver for Discorable. indica que el modo de escaneo Bluetooth del adaptador local ha cambiado.
     private final BroadcastReceiver broadcastReceiverDiscorable = new BroadcastReceiver() {
         public void onReceive(Context context, Intent intent) {
+            showPairedDevices();
             String action = intent.getAction();
             if (Objects.requireNonNull(action).equals(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED)) {
                 int mode = intent.getIntExtra(BluetoothAdapter.EXTRA_SCAN_MODE, BluetoothAdapter.ERROR);
@@ -216,7 +218,6 @@ public class MainActivity extends AppCompatActivity implements DeviceBondedAdapt
                     enableDiscoverable();
                     btnUpdate.setEnabled(true);
                     showRecyclers();
-                    showPairedDevices();
                     discoverDevices();
                 } else {
                     enableDisableBluetooth();
@@ -357,19 +358,15 @@ public class MainActivity extends AppCompatActivity implements DeviceBondedAdapt
     @Override
     public void onDeviceAvailableClick(int position) {
         bluetoothAdapter.cancelDiscovery();
-        bondedDevices.get(position).createBond();
+        bluetoothDevices.get(position).createBond();
         showPairedDevices();
-
-        bluetoothDevice = bondedDevices.get(position);
-
-//        bluetoothConnectionService = new BluetoothConnectionService(MainActivity.this);
-
-
     }
 
     @Override
     public void onDeviceBondedClick(int position) {
-
+        bluetoothDevice = bluetoothDevices.get(position);
+        bluetoothConnectionService = new BluetoothConnectionService(MainActivity.this);
+//        startBluetoothConnection
     }
 }
 
